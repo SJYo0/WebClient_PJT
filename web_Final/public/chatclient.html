@@ -1,0 +1,307 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <link href="./bootstrap.min.css" rel="stylesheet" />
+    <title>Chatting</title>
+    <style>
+        body { display: flex; font-family: Arial, sans-serif; margin: 0; height: 100vh; }
+
+        #sidebar {
+            width: 250px;
+            background: #f0f0f0;
+            border-right: 1px solid #ccc; 
+            padding: 10px;
+            box-sizing: border-box;
+        }
+
+        #chatRooms { list-style: none; padding: 0; margin: 10px 0; }
+
+        #chatRooms li { padding: 8px; border-bottom: 1px solid #ddd; }
+
+        #chatRooms li:hover { background: #ddd; }
+
+        #main {
+            flex-grow: 1;
+            display: flex;
+            flex-direction: column;
+            padding: 10px;
+        }
+
+        #input { display: inline; }
+
+        #input > input { display:inline; width : 80%; height: 40px; }
+
+        #input > button { width : 13%; }
+
+        #chatBox {
+            display: block;
+            flex-grow: 1;
+            border: 1px solid lightslategray;
+            padding: 10px;
+            overflow-y: scroll;
+            background: gainsboro;
+            margin-bottom: 10px;
+        }
+
+        #roomname { padding: 5px; }
+
+        .mine { 
+            align-self: flex-end; 
+            text-align: right; 
+            float: right; 
+            border-radius: 15px 15px 0px 15px;
+        }
+
+        .other { 
+            align-self: flex-start; 
+            text-align: left; 
+            float: left; 
+            border-radius: 15px 15px 15px 0px; 
+        }
+
+        .emoji:hover { background: #ddd; }
+    </style>
+
+    <script>
+        let name = null;
+        let files = [
+            "emoji/e_angry.png",
+            "emoji/e_crying.png",
+            "emoji/e_party.png",
+            "emoji/e_smile.png",
+            "emoji/e_smiling.png"
+        ]
+        let imgs = new Array();
+
+        window.onload = function() {
+            while (!name) {
+                name = prompt("사용할 닉네임을 입력해주세요.");
+                if (name === null) {
+                    alert("닉네임은 필수입니다.");
+                }
+            }
+
+            let name_insert = document.getElementById("name");
+            name_insert.innerHTML = `<h4 class="card-title"><strong>${name}</strong></h4>`;
+
+            for(let i=0; i<files.length; i++){
+                imgs[i] = new Image();
+                imgs[i].src = files[i];
+            }
+        }
+    </script>
+
+</head>
+<body>
+<!-- --------- html 화면 구성 코드 시작 ---------------- -->
+<div id="sidebar" style="align-items: center;">
+    <div id="NameSlot" class="card text-white bg-primary mb-3" style="max-width: 20rem; align-items: center;">
+        <div class="card-header" style="width: 100%;">닉네임</div>
+        <div class="card-body" id="name"></div>
+        <button onclick="changeNickname()" class="btn btn-secondary" style="width: 80%;"> 닉네임 변경 </button><br>
+    </div>
+
+    <button onclick="createRoom()" class="btn btn-success" style="width: 100%;"> 새 채팅방 개설 </button>
+
+    <ul id="chatRooms"></ul>
+
+    <button onclick="deleteRoom()" type="button" class="btn btn-outline-danger" style="width: 100%;">내 채팅방 삭제</button>
+</div>
+<div id="main">
+    <div id="roomname"></div>
+    <div id="chatBox"></div>
+    <div id="input">
+        <input type="text" id="messageInput" class="form-control" placeholder="메세지를 입력하세요." />
+        <button onclick="openEmoji()" class="btn btn-outline-info" style="width: 5%;"><img src="emoji/e_smiling.png" width="20" height="20"></button> 
+        <button onclick="sendMessage()" class="btn btn-outline-info">전송</button>
+    </div>
+</div>
+<!-- --------- html 화면 구성 코드 종료 ---------------- -->
+
+<!-- ----------- AJAX 함수 코드 시작 ---------------- -->
+<script>
+    let rooms = [];
+    let currentRoom = null;
+    let msgNum = 0;
+
+    function changeNickname(){
+        name = null;
+        while (!name) {
+            name = prompt("사용할 닉네임을 입력해주세요.");
+            if (name === null) {
+                alert("닉네임은 필수입니다.");
+            }
+
+            const name_insert = document.getElementById("name");
+            name_insert.innerHTML = `<h4 class="card-title"><strong>${name}</strong></h4>`;
+        }
+    }
+
+    function createRoom() {
+        const roomName = name+"의 채팅방";
+        const xhr = new XMLHttpRequest();
+        xhr.open("GET", `/createRoom?room=${encodeURIComponent(roomName)}`);
+        xhr.send();
+    }
+
+    function selectRoom(roomName) {
+        currentRoom = roomName;
+        msgNum = 0;
+        document.getElementById("roomname").innerHTML = `<h4 class="card-title"><strong>${currentRoom}</strong></h4>`;;
+        document.getElementById("chatBox").innerHTML = "";
+    }
+
+    function deleteRoom() {
+        const room = name+"의 채팅방";
+        if (!rooms.includes(room)) {
+            alert("개설된 본인 채팅방이 없습니다.");
+            return;
+        }
+        const xhr = new XMLHttpRequest();
+        xhr.open("GET", `/deleteRoom?room=${encodeURIComponent(room)}`);
+        xhr.onreadystatechange = function () {
+            if (xhr.readyState === 4 && xhr.status === 200) {
+                if (currentRoom === room) {
+                    currentRoom = null;
+                    msgNum = 0;
+                    document.getElementById("chatBox").innerHTML = "";
+                    document.getElementById("roomname").innerHTML = "";
+                }
+            }
+        };
+        xhr.send();
+    }
+
+    function sendMessage() {
+        if (!currentRoom) return alert("채팅방을 먼저 선택하세요");
+        let now = new Date();
+        const msg = document.getElementById("messageInput").value.trim();
+        if (msg === "") return;
+        const hour = Number(now.getHours());
+        const min = Number(now.getMinutes());
+
+
+        const xhr = new XMLHttpRequest();
+        xhr.open("GET", `/input?msg=${encodeURIComponent(msg)}&name=${encodeURIComponent(name)}&room=${encodeURIComponent(currentRoom)}&hour=${encodeURIComponent(hour)}&min=${encodeURIComponent(min)}`);
+        // incodeURICompent는 띄어쓰기를 주소에 담아줌(아니면 오류)
+        xhr.send();
+        document.getElementById("messageInput").value = "";
+    }
+
+    function Get_Messages() {
+        if (!currentRoom) return;
+        const xhr = new XMLHttpRequest();
+        xhr.open("GET", `/get?msg_num=${msgNum}&room=${encodeURIComponent(currentRoom)}`);
+        xhr.onreadystatechange = function() {
+            if (xhr.readyState === 4 && xhr.status === 200) {
+                const data = JSON.parse(xhr.responseText); // 객체 받기
+                const chatBox = document.getElementById("chatBox");
+                let isMine;
+                for (let i = 0; i < data.length; i++) {
+                    const msg = data[i];
+                    const sender = msg.name;
+                    let content = msg.msg;
+                    const hour = msg.hour;
+                    const min = msg.min;
+                    for (let j = 0; j<files.length; j++){
+                        if (content === files[j]){
+                            content = `<img src="${imgs[j].src}" width="70" height="70" style="padding:7px;"/>`;
+                        }
+                    }
+                    if(sender === name) {
+                        isMine = "mine";
+                        chatBox.innerHTML += `<div class="${isMine} card text-white bg-success" style="max-width: 20rem;">
+                                                <div class="card-header" 
+                                                style="padding-top:0px; padding-bottom:0px padding-right:10px; padding-left:10px; 
+                                                height:25px; background:white; color:black; border-radius: 15px 15px 0px 0px;">${sender}</div>
+                                                    <div class="card-body" style="padding-top:0px; padding-bottom:0px; padding-right:10px; padding-left:10px;
+                                                    background:olivedrab; border-radius: 0px 0px 0px 15px;">
+                                                    <p class="card-text"><span style=" font-size: 11px; padding-right: 13px;">${hour} : ${min}</span>${content}</p>
+                                                </div>
+                                            </div><div style="clear: both; height:8px;"></div>`;
+                    }
+                    else {
+                        isMine = "other";
+                        chatBox.innerHTML += `<div class="${isMine} card text-white bg-info" style="max-width: 20rem;">
+                                                <div class="card-header" 
+                                                style="padding-top:0px; padding-bottom:0px padding-right:10px; padding-left:10px; 
+                                                height:25px; background:white; color:black; border-radius: 15px 15px 0px 0px;">${sender}</div>
+                                                    <div class="card-body" style="padding-top:0px; padding-bottom:0px; padding-right:10px; padding-left:10px;">
+                                                    <p class="card-text">${content}<span style=" font-size: 11px; padding-left: 13px;">${hour} : ${min}</span></p>
+                                                </div>
+                                            </div><div style="clear: both; height:8px;"></div>`;
+                    }
+                    chatBox.scrollTop = chatBox.scrollHeight;
+                    msgNum++;
+                }
+            }
+        };
+        xhr.send();
+    }
+
+    function updateRoomList() {
+        const xhr = new XMLHttpRequest();
+        xhr.open("GET", "/rooms");
+        xhr.onreadystatechange = function() {
+            if (xhr.readyState === 4 && xhr.status === 200) {
+                const serverRooms = JSON.parse(xhr.responseText);
+                const ul = document.getElementById("chatRooms");
+                ul.innerHTML = ""; // 비우기
+                for (let i = 0; i < serverRooms.length; i++) {
+                    const room = serverRooms[i];
+                    const li = document.createElement("li");
+                    li.textContent = room;
+                    li.onclick = function() {
+                        selectRoom(room);
+                    };
+                    ul.appendChild(li);
+                }
+                rooms = serverRooms;
+            }
+        };
+        xhr.send();
+    }
+
+    function openEmoji() {
+        const sel_emoji = document.getElementById("main");
+        sel_emoji.innerHTML += `<div id="emoji_area" style="width:100%; padding:8px;">
+                                <div class="card border-primary" style="width: 100%;">
+                                    <div class="card-header">사용할 이모티콘을 선택해주세요.
+                                        <button type="button" class="btn-close" data-bs-dismiss="modal" style="float: right;" onclick="closeEmoji()"></button></div>
+                                    <div class="card-body" id="emoji_slot" style="display:inline;">
+                                        
+                                    </div>
+                                </div></div>`
+        
+        const slot = document.getElementById("emoji_slot");
+        for (let i = 0; i<files.length; i++){
+            const insert_img = document.createElement("img");
+            insert_img.src = imgs[i].src;
+            insert_img.width = 70;
+            insert_img.height = 70;
+            insert_img.style.margin = "10px";
+            insert_img.className = "emoji";
+            insert_img.onclick = function(){
+                selectEmoji(files[i]);
+            };
+            slot.appendChild(insert_img);
+        }
+    }
+
+    function closeEmoji() {
+        const sel_emoji = document.getElementById("main");
+        const emoji_area = document.getElementById("emoji_area");
+        sel_emoji.removeChild(emoji_area);
+    }
+
+    function selectEmoji(e) {
+        document.getElementById("messageInput").value = e;
+    }
+
+    setInterval(Get_Messages, 1000);
+    setInterval(updateRoomList, 1000);
+</script>
+<!-- ----------- AJAX 함수 코드 종료 ---------------- -->
+</body>
+</html>
